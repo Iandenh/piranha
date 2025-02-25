@@ -1,0 +1,45 @@
+# Aangepaste scope-configuratie voor PHP.
+# Deze configuratie specificeert hoe functies, klassen en bestanden (het hele programma) moeten worden gevangen door Piranha.
+#
+# Functies: Gebruik de Tree-sitter–PHP node "function_definition" die bestaat uit een naam, formele parameters en een compound_statement (body).
+#
+# Klassen: De node "class_declaration" bevat een "name".
+#
+# Bestand: In PHP is de root node vaak "program".
+
+[[scopes]]
+name = "Function"
+[[scopes.rules]]
+enclosing_node = """
+((function_definition
+    name: (name) @n
+    parameters: (formal_parameters) @sign
+    body: (compound_statement) @fb) @func)
+"""
+scope = """(
+((function_definition
+    name: (name) @z
+    parameters: (formal_parameters) @g_sign
+    body: (compound_statement) @g_fb) @g_func)
+(#eq? @z "@n")
+(#eq? @g_sign "@sign")
+)"""
+
+[[scopes]]
+name = "Class"
+[[scopes.rules]]
+enclosing_node = "(class_declaration (name) @n) @c"
+scope = """
+(
+((class_declaration (name) @z) @qc)
+(#eq? @z "@n")
+)
+"""
+
+[[scopes]]
+name = "File"
+[[scopes.rules]]
+enclosing_node = """
+(program) @s_f
+"""
+scope = "(program) @source_file"

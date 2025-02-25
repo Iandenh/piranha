@@ -21,8 +21,8 @@ use crate::utilities::parse_toml;
 
 use super::{
   default_configs::{
-    default_language, GO, JAVA, JAVA_CS, KOTLIN, KOTLIN_ALIAS, PYTHON, RUBY, SCALA, STRINGS, SWIFT,
-    THRIFT, TSX, TS_SCHEME, TYPESCRIPT, YAML, YAML_ALIAS,
+    default_language, GO, JAVA, JAVA_CS, KOTLIN, KOTLIN_ALIAS, PHP, PYTHON, RUBY, SCALA, STRINGS,
+    SWIFT, THRIFT, TSX, TS_SCHEME, TYPESCRIPT, YAML, YAML_ALIAS,
   },
   outgoing_edges::Edges,
   rule::Rules,
@@ -64,6 +64,7 @@ pub enum SupportedLanguage {
   Ts,
   Tsx,
   Python,
+  Php,
   Thrift,
   Strings,
   TsScheme,
@@ -201,6 +202,25 @@ impl std::str::FromStr for PiranhaLanguage {
         scopes: vec![],
         comment_nodes: vec![],
       }),
+      PHP => {
+        // let php_rules: Rules = parse_toml(include_str!("../cleanup_rules/php/rules.toml"));
+        // let php_edges: Edges = parse_toml(include_str!("../cleanup_rules/php/edges.toml"));
+
+        Ok(PiranhaLanguage {
+          extension: "php".to_string(),
+          supported_language: SupportedLanguage::Php,
+          language: tree_sitter_php::language(),
+          rules: None,
+          edges: None,
+          // scopes: parse_toml::<ScopeConfig>(include_str!(
+          //   "../cleanup_rules/php/scope_config.toml"
+          // ))
+          // .scopes()
+          // .to_vec(),
+          scopes: vec![],
+          comment_nodes: vec![],
+        })
+      }
       SWIFT => {
         let rules: Rules = parse_toml(include_str!("../cleanup_rules/swift/rules.toml"));
         let edges: Edges = parse_toml(include_str!("../cleanup_rules/swift/edges.toml"));
