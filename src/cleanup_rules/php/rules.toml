@@ -1,232 +1,542 @@
-# Aangepaste regels voor PHP.
-# Deze regels gebruiken de Tree-sitter–PHP grammatica en behandelen onder andere:
-#   - Boolean expressie–samenvoeging en vereenvoudiging (bijv. overbodige haakjes, logische operatoren)
-#   - Vereenvoudigen van if–statements (bv. if (true) { … } -> { … })
-#   - Refactoring van feature flags: vervang Feature::enabled(...) door "true" en Feature::disabled(...) door "false".
+# Copyright (c) 2023 Uber Technologies, Inc.
 #
-# Let op: Deze regels vormen een vereenvoudigde set en kunnen verder uitgebreid worden naarmate de noden groeien.
+# <p>Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+# except in compliance with the License. You may obtain a copy of the License at
+# <p>http://www.apache.org/licenses/LICENSE-2.0
+#
+# <p>Unless required by applicable law or agreed to in writing, software distributed under the
+# License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied. See the License for the specific language governing permissions and
+# limitations under the License.
 
-#########################
-# Boolean literal cleanup
-#########################
+# Dummy rule that acts as a junction for all boolean based cleanups
 [[rules]]
-name = "simplify_parenthesized_expression"
+name = "boolean_literal_cleanup"
+is_seed_rule = false
+
+# Before: !false
+# After: true
+[[rules]]
+name = "simplify_not_false"
 query = """
 (
-  (parenthesized_expression ((true) | (false)) @literal) @pe
+  (unary_op_expression
+    "!"
+    (boolean) @b
+  ) @unary_expression
+  (#eq? @b "false")
 )
 """
-replace = "@literal"
-replace_node = "pe"
+replace = "true"
+replace_node = "unary_expression"
 groups = ["boolean_expression_simplify"]
 is_seed_rule = false
 
-#########################
-# If statement vereenvoudigingen
-#########################
+# Before: !true
+# After: false
 [[rules]]
-groups = ["if_cleanup", "boolean_expression_simplify"]
-name = "simplify_if_true"
+name = "simplify_not_true"
 query = """
 (
-  (if_statement
-     condition: (parenthesized_expression ((true) | (false)) @condition)
-     statement: (compound_statement) @consequence
-  ) @if_statement
-  (#eq? @condition "true")
+  (unary_op_expression
+    "!"
+    (boolean) @b
+  ) @unary_expression
+  (#eq? @b "true")
 )
 """
-replace = "@consequence"
-replace_node = "if_statement"
-is_seed_rule = false
-
-[[rules]]
-groups = ["if_cleanup", "boolean_expression_simplify"]
-name = "simplify_if_false_with_alternative"
-query = """
-(
-  (if_statement
-     condition: (parenthesized_expression ((true) | (false)) @condition)
-     statement: (compound_statement) @consquent
-     else_clause: (else_clause (compound_statement) @alternative)
-  ) @if_statement
-  (#eq? @condition "false")
-)
-"""
-replace = "@alternative"
-replace_node = "if_statement"
-is_seed_rule = false
-
-#########################
-# Boolean operator vereenvoudigingen (AND)
-#########################
-[[rules]]
+replace = "false"
+replace_node = "unary_expression"
 groups = ["boolean_expression_simplify"]
+is_seed_rule = false
+
+# Before: true && something()
+# After: something()
+[[rules]]
 name = "simplify_true_and_something"
 query = """
 (
   (binary_expression
-     left: ((true) @lhs)
-     operator: "&&"
-     right: (_) @rhs
+    left: (boolean) @b
+    operator: "&&"
+    right: (_) @rhs
   ) @binary_expression
+  (#eq? @b "true")
 )
 """
 replace = "@rhs"
 replace_node = "binary_expression"
+groups = ["boolean_expression_simplify"]
 is_seed_rule = false
 
+# Before: something() && true
+# After: something()
 [[rules]]
-groups = ["boolean_expression_simplify"]
 name = "simplify_something_and_true"
 query = """
 (
   (binary_expression
-     left: (_) @lhs
-     operator: "&&"
-     right: ((true) @rhs)
+    left: (_) @lhs
+    operator: "&&"
+    right: (boolean) @b
   ) @binary_expression
+  (#eq? @b "true")
 )
 """
 replace = "@lhs"
 replace_node = "binary_expression"
+groups = ["boolean_expression_simplify"]
 is_seed_rule = false
 
-#########################
-# Boolean operator vereenvoudigingen (OR)
-#########################
+# Before: false && something()
+# After: false
 [[rules]]
+name = "simplify_false_and_something"
+query = """
+(
+  (binary_expression
+    left: (boolean) @b
+    operator: "&&"
+    right: (_) @rhs
+  ) @binary_expression
+  (#eq? @b "false")
+)
+"""
+replace = "false"
+replace_node = "binary_expression"
 groups = ["boolean_expression_simplify"]
+is_seed_rule = false
+
+# Before: something() && false
+# After: false
+[[rules]]
+name = "simplify_something_and_false"
+query = """
+(
+  (binary_expression
+    left: (_) @lhs
+    operator: "&&"
+    right: (boolean) @b
+  ) @binary_expression
+  (#eq? @b "false")
+)
+"""
+replace = "false"
+replace_node = "binary_expression"
+groups = ["boolean_expression_simplify"]
+is_seed_rule = false
+
+# Before: something() || true
+# After: true
+[[rules]]
+name = "simplify_something_or_true"
+query = """
+(
+  (binary_expression
+    left: (_) @lhs
+    operator: "||"
+    right: (boolean) @b
+  ) @binary_expression
+  (#eq? @b "true")
+)
+"""
+replace = "true"
+replace_node = "binary_expression"
+groups = ["boolean_expression_simplify"]
+is_seed_rule = false
+
+# Before: true || something()
+# After: true
+[[rules]]
+name = "simplify_true_or_something"
+query = """
+(
+  (binary_expression
+    left: (boolean) @b
+    operator: "||"
+    right: (_) @rhs
+  ) @binary_expression
+  (#eq? @b "true")
+)
+"""
+replace = "true"
+replace_node = "binary_expression"
+groups = ["boolean_expression_simplify"]
+is_seed_rule = false
+
+# Before: something() || false
+# After: something()
+[[rules]]
 name = "simplify_something_or_false"
 query = """
 (
   (binary_expression
-     left: (_) @lhs
-     operator: "||"
-     right: ((false) @rhs)
+    left: (_) @lhs
+    operator: "||"
+    right: (boolean) @b
   ) @binary_expression
+  (#eq? @b "false")
 )
 """
 replace = "@lhs"
 replace_node = "binary_expression"
+groups = ["boolean_expression_simplify"]
 is_seed_rule = false
 
+# Before: false || something()
+# After: something()
 [[rules]]
-groups = ["boolean_expression_simplify"]
 name = "simplify_false_or_something"
 query = """
 (
   (binary_expression
-     left: ((false) @lhs)
-     operator: "||"
-     right: (_) @rhs
+    left: (boolean) @b
+    operator: "||"
+    right: (_) @rhs
   ) @binary_expression
+  (#eq? @b "false")
 )
 """
 replace = "@rhs"
 replace_node = "binary_expression"
+groups = ["boolean_expression_simplify"]
 is_seed_rule = false
 
-#########################
-# Negatie vereenvoudigingen
-#########################
+# Before: $x == $x
+# After: true
 [[rules]]
-groups = ["boolean_expression_simplify"]
-name = "simplify_not_false"
+name = "simplify_identity_equal"
 query = """
 (
-  (prefix_unary_expression
-      operator: "!"
-      argument: ((false) @exp)
-  ) @prefix_unary_expression
+  (binary_expression
+    left: (_) @lhs
+    operator: "=="
+    right: (_) @rhs
+  ) @binary_expression
+  (#eq? @lhs @rhs)
 )
 """
 replace = "true"
-replace_node = "prefix_unary_expression"
-is_seed_rule = false
-
-[[rules]]
+replace_node = "binary_expression"
 groups = ["boolean_expression_simplify"]
-name = "simplify_not_true"
+is_seed_rule = false
+
+# Before: $x != $x
+# After: false
+[[rules]]
+name = "simplify_identity_not_equal"
 query = """
 (
-  (prefix_unary_expression
-      operator: "!"
-      argument: ((true) @exp)
-  ) @prefix_unary_expression
+  (binary_expression
+    left: (_) @lhs
+    operator: "!="
+    right: (_) @rhs
+  ) @binary_expression
+  (#eq? @lhs @rhs)
 )
 """
 replace = "false"
-replace_node = "prefix_unary_expression"
+replace_node = "binary_expression"
+groups = ["boolean_expression_simplify"]
 is_seed_rule = false
 
-#########################
-# Feature flag refactoring
-#########################
+# Dummy rule that acts as a junction for all statement based cleanups
 [[rules]]
-groups = ["feature_flag_refactor", "boolean_expression_simplify"]
-name = "refactor_feature_flag_enabled"
+name = "statement_cleanup"
+is_seed_rule = false
+
+# Before: if (true) { doSomething(); }
+# After: { doSomething(); }
+[[rules]]
+name = "simplify_if_statement_true"
 query = """
 (
-  (scoped_call_expression
-      class: (name) @class
-      name: (name) @method
-      arguments: (arguments (argument_list) @flag)
-  ) @call
-  (#eq? @class "Feature")
-  (#eq? @method "enabled")
+  (if_statement
+    (parenthesized_expression
+      (boolean) @b
+    )
+    (compound_statement) @consequence
+  ) @if_statement
+  (#eq? @b "true")
 )
 """
-replace = "true"
-replace_node = "call"
+replace = "@consequence"
+replace_node = "if_statement"
+groups = ["if_cleanup"]
 is_seed_rule = false
 
+# Before: if (false) { doSomething(); } else { doSomethingElse(); }
+# After: { doSomethingElse(); }
 [[rules]]
-groups = ["feature_flag_refactor", "boolean_expression_simplify"]
-name = "refactor_feature_flag_disabled"
+name = "simplify_if_statement_false"
 query = """
 (
-  (scoped_call_expression
-      class: (name) @class
-      name: (name) @method
-      arguments: (arguments (argument_list) @flag)
-  ) @call
-  (#eq? @class "Feature")
-  (#eq? @method "disabled")
+  (if_statement
+    (parenthesized_expression
+      (boolean) @b
+    )
+    (_)
+    (else_clause
+      (compound_statement) @alternative
+    )
+  ) @if_statement
+  (#eq? @b "false")
 )
 """
-replace = "false"
-replace_node = "call"
+replace = "@alternative"
+replace_node = "if_statement"
+groups = ["if_cleanup"]
 is_seed_rule = false
 
-#########################
-# Verwijder statements na een return
-#########################
+# Before: if (false) { doSomething(); }
+# After:
 [[rules]]
-name = "delete_all_statements_after_return"
+name = "simplify_if_statement_false_no_else"
+query = """
+(
+  (if_statement
+    (parenthesized_expression
+      (boolean) @b
+    )
+    (_)
+    .
+  ) @if_statement
+  (#eq? @b "false")
+)
+"""
+replace = ""
+replace_node = "if_statement"
+groups = ["if_cleanup"]
+is_seed_rule = false
+
+# Before: { someStepsBefore(); { someSteps(); } someStepsAfter(); }
+# After: { someStepsBefore(); someSteps(); someStepsAfter(); }
+[[rules]]
+name = "remove_unnecessary_nested_block"
 query = """
 (
   (compound_statement
-    (block_items
-      (_)* @pre
-      (return_statement) @return_stmt
-      (_)+ @post
-    ) @block_items
-    (#match? @return_stmt "return")
-  )
+    (_)* @pre
+    (compound_statement (_)* @nested.statements) @nested.block
+    (_)* @post
+  ) @outer.block
+)
+"""
+replace = "@nested.statements"
+replace_node = "nested.block"
+is_seed_rule = false
+
+# Dummy rule to introduce a cycle for `delete_statement_after_return`
+[[rules]]
+name = "return_statement_cleanup"
+is_seed_rule = false
+
+# Before: { something(); return 10; somethingMore(); }
+# After: { something(); return 10; }
+[[rules]]
+name = "delete_statement_after_return"
+query = """
+(
+  (compound_statement
+    (_)* @pre
+    (return_statement) @r
+    (_)+ @post
+  ) @stmt_list
 )
 """
 replace = ""
 replace_node = "post"
 is_seed_rule = false
 
-#########################
-# Dummy regels voor cleanups
-#########################
+# Before: $enabled = true;
+# After:
 [[rules]]
-name = "boolean_literal_cleanup"
+name = "delete_variable_declaration"
+query = """
+(
+  (expression_statement
+    (assignment_expression
+      left: (variable_name) @variable_name
+      right: (boolean) @value
+    )
+  ) @var_decl
+)
+"""
+replace = ""
+replace_node = "var_decl"
 is_seed_rule = false
+[[rules.filters]]
+enclosing_node = "(compound_statement) @block"
+not_contains = ["""
+(
+  (expression_statement
+    (assignment_expression
+      left: (variable_name) @a.lhs
+      right: (_) @a.rhs
+    )
+  )
+  (#eq? @a.lhs "@variable_name")
+  (#not-eq? @a.rhs "@value")
+)
+"""]
+
+# Before: list($enabled, $err) = [true, null];
+# After:
+[[rules]]
+name = "delete_variable_declaration_with_null"
+query = """
+(
+  (expression_statement
+    (assignment_expression
+      left: (list_literal
+        (variable_name) @variable_name
+        (variable_name) @err
+      )
+      right: (array_creation_expression
+        (array_element_initializer
+          (boolean) @value
+        )
+        (array_element_initializer
+          (null) @null_value
+        )
+      )
+    )
+  ) @var_decl
+)
+"""
+replace = ""
+replace_node = "var_decl"
+is_seed_rule = false
+[[rules.filters]]
+enclosing_node = "(compound_statement) @block"
+not_contains = ["""
+(
+  (expression_statement
+    (assignment_expression
+      left: (variable_name) @a.lhs
+      right: (_) @a.rhs
+    )
+  )
+  (#eq? @a.lhs "@variable_name")
+  (#not-eq? @a.rhs "@value")
+)
+"""]
+
+# Replace $variable_name with the boolean value
+[[rules]]
+name = "replace_identifier_with_value"
+query = """
+(
+  (variable_name) @identifier
+  (#eq? @identifier "@variable_name")
+)
+"""
+replace = "@value"
+replace_node = "identifier"
+holes = ["variable_name", "value"]
+is_seed_rule = false
+[[rules.filters]]
+enclosing_node = "(compound_statement) @block"
+not_contains = ["""
+(
+  (expression_statement
+    (assignment_expression
+      left: (variable_name) @vn
+    )
+  )
+  (#eq? @vn "@variable_name")
+)
+"""]
 
 [[rules]]
-name = "statement_cleanup"
-is_seed_rule = false
+name = "replace_feature_enabled_with_true"
+query = """
+(
+  (scoped_call_expression
+    scope: (name) @class_name
+    name: (name) @method_name
+    arguments: (arguments
+      (argument
+        (class_constant_access_expression
+          (name) @flag_class
+          (name) @flag_name
+        )
+      )
+    )
+  ) @method_call
+  (#eq? @class_name "Feature")
+  (#eq? @method_name "enabled")
+  (#eq? @flag_class "FeatureFlag")
+  (#eq? @flag_name "@stale_flag_name")
+)
+"""
+replace_node = "method_call"
+replace = "true"
+groups = ["replace_expression_with_boolean_literal"]
+holes = ["stale_flag_name"]
+is_seed_rule = true
+
+#
+# For @stale_flag_name = TMP_BALANCE_EXPIRATION
+# Before: Feature::disabled(FeatureFlag::TMP_BALANCE_EXPIRATION)
+# After: false
+#
+[[rules]]
+name = "replace_feature_disabled_with_false"
+query = """
+(
+  (scoped_call_expression
+    scope: (name) @class_name
+    name: (name) @method_name
+    arguments: (arguments
+      (argument
+        (class_constant_access_expression
+          (name) @flag_class
+          (name) @flag_name
+        )
+      )
+    )
+  ) @method_call
+  (#eq? @class_name "Feature")
+  (#eq? @method_name "disabled")
+  (#eq? @flag_class "FeatureFlag")
+  (#eq? @flag_name "@stale_flag_name")
+)
+"""
+replace_node = "method_call"
+replace = "false"
+groups = ["replace_expression_with_boolean_literal"]
+holes = ["stale_flag_name"]
+is_seed_rule = true
+
+#
+# For @stale_flag_name = TMP_BALANCE_EXPIRATION
+# Before:
+#   class FeatureFlag {
+#     const TMP_BALANCE_EXPIRATION = 'tmp_balance_expiration';
+#     const OTHER_FLAG = 'other_flag';
+#   }
+# After:
+#   class FeatureFlag {
+#     const OTHER_FLAG = 'other_flag';
+#   }
+#
+[[rules]]
+name = "delete_feature_flag_constant"
+query = """
+(
+  (const_declaration
+    (visibility_modifier)?
+    (const_element
+      (name) @const_name
+      (_) @const_value
+    ) @const_element
+  ) @const_declaration
+  (#eq? @const_name "@stale_flag_name")
+)
+"""
+replace_node = "const_declaration"
+replace = ""
+holes = ["stale_flag_name"]
+groups = ["delete_enum_entry"]
+is_seed_rule = true

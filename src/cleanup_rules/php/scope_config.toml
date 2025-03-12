@@ -1,45 +1,78 @@
-# Aangepaste scope-configuratie voor PHP.
-# Deze configuratie specificeert hoe functies, klassen en bestanden (het hele programma) moeten worden gevangen door Piranha.
+# Copyright (c) 2023 Uber Technologies, Inc.
 #
-# Functies: Gebruik de Tree-sitter–PHP node "function_definition" die bestaat uit een naam, formele parameters en een compound_statement (body).
+# <p>Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file
+# except in compliance with the License. You may obtain a copy of the License at
+# <p>http://www.apache.org/licenses/LICENSE-2.0
 #
-# Klassen: De node "class_declaration" bevat een "name".
-#
-# Bestand: In PHP is de root node vaak "program".
+# <p>Unless required by applicable law or agreed to in writing, software distributed under the
+# License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either
+# express or implied. See the License for the specific language governing permissions and
+# limitations under the License.
+
+# This file specifies the scope generators for PHP
 
 [[scopes]]
 name = "Function"
 [[scopes.rules]]
 enclosing_node = """
-((function_definition
-    name: (name) @n
-    parameters: (formal_parameters) @sign
-    body: (compound_statement) @fb) @func)
+(
+function_definition
+  name: (_) @n
+  parameters : (formal_parameters)@fp
+) @xdn
 """
-scope = """(
-((function_definition
-    name: (name) @z
-    parameters: (formal_parameters) @g_sign
-    body: (compound_statement) @g_fb) @g_func)
+scope = """
+(function_definition
+  name: (_) @z
+  parameters : (formal_parameters)@tp
+) @qdn
 (#eq? @z "@n")
-(#eq? @g_sign "@sign")
-)"""
+(#eq? @tp "@fp")
+"""
+
+[[scopes]]
+name = "Method"
+[[scopes.rules]]
+enclosing_node = """
+(method_declaration
+  name: (_) @n
+  parameters : (formal_parameters)@fp
+) @xdn
+"""
+scope = """
+(method_declaration
+  name: (_) @z
+  parameters : (formal_parameters)@tp
+) @qdn
+(#eq? @z "@n")
+(#eq? @tp "@fp")
+"""
 
 [[scopes]]
 name = "Class"
 [[scopes.rules]]
-enclosing_node = "(class_declaration (name) @n) @c"
+enclosing_node = """
+[
+  (class_declaration name: (_) @n) @c
+  (interface_declaration name: (_) @n) @c
+  (trait_declaration name: (_) @n) @c
+  (enum_declaration name:(_) @n) @c
+]
+"""
 scope = """
-(
-((class_declaration (name) @z) @qc)
+[
+  ((class_declaration name: (_) @z) @qc)
+  ((interface_declaration name: (_) @z) @qc)
+  ((trait_declaration name: (_) @z) @qc)
+  ((enum_declaration name:(_) @z) @qc)
+]
 (#eq? @z "@n")
-)
 """
 
 [[scopes]]
 name = "File"
 [[scopes.rules]]
 enclosing_node = """
-(program) @s_f
+(program) @source_file
 """
-scope = "(program) @source_file"
+scope = """(program) @sf"""
