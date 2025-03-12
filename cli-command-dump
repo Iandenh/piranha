@@ -1,0 +1,1 @@
+./polyglot_piranha --paths-to-codebase ~/yeet --path-to-configurations ../../src/cleanup_rules/php -l php -s stale_flag_name=TMP_FEATURE_FLAG
